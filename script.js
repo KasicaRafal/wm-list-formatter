@@ -7,34 +7,28 @@ const copyBtn = document.getElementById("copyBtn");
 const toast = document.getElementById("toast");
 
 function showToast(message) {
-
     toast.textContent = message;
-
     toast.classList.add("show");
 
     setTimeout(() => {
         toast.classList.remove("show");
     }, 2000);
-
 }
 
 function formatList(text) {
 
-    // Split into lines
     let lines = text.split(/\r?\n/);
 
     // Remove everything before and including "PC CARD"
     let cutoff = 0;
 
     for (let i = 0; i < lines.length; i++) {
-
         const stripped = lines[i].trim();
 
-        if (stripped.includes("PC") && stripped.includes("CARD")) {
+        if (stripped === "PC CARD" || stripped === "PC      CARD") {
             cutoff = i + 1;
             break;
         }
-
     }
 
     lines = lines.slice(cutoff);
@@ -43,17 +37,13 @@ function formatList(text) {
     lines = lines.filter(line => line.trim() !== "");
 
     // Normalize spaces
-    lines = lines.map(line =>
-        line.replace(/[ \t]+/g, " ")
-    );
+    lines = lines.map(line => line.replace(/[ \t]+/g, " "));
 
     // Remove SPELL lines
-    lines = lines.filter(line =>
-        !/^\s*SPELL/.test(line)
-    );
+    lines = lines.filter(line => !line.trim().startsWith("SPELL"));
 
     // Remove battlefield objects
-    const removable = [
+    const removeWords = [
         "Heavy Weapon Crate",
         "HEAVY WEAPON -",
         "Blocker",
@@ -66,31 +56,32 @@ function formatList(text) {
     ];
 
     lines = lines.filter(line => {
+        const t = line.trim();
 
-        const trimmed = line.trim();
+        for (const word of removeWords) {
+            if (t.includes(word)) {
+                return false;
+            }
+        }
 
-        return !removable.some(item => trimmed.startsWith(item));
-
+        return true;
     });
 
-    // Replace DEFENSE 1 -
+    // DEFENSE 1 -
     lines = lines.map(line =>
         line.replace(/^\s*DEFENSE\s+1\s*-/, " ")
     );
 
-    // First "Defenses"
+    // First Defenses
     let defenseDone = false;
 
     lines = lines.map(line => {
 
-        if (!defenseDone && /^\s*Defenses/.test(line)) {
+        if (!defenseDone && line.trim().startsWith("Defenses")) {
 
             defenseDone = true;
 
-            return line.replace(
-                /^\s*Defenses/,
-                "\nDEFENSES"
-            );
+            return "\nDEFENSES" + line.trim().substring("Defenses".length);
 
         }
 
@@ -100,13 +91,10 @@ function formatList(text) {
 
     // PC COMMAND CARD
     lines = lines.map(line =>
-        line.replace(
-            /^PC COMMAND CARD/,
-            "\nPC COMMAND CARD"
-        )
+        line.replace(/^PC COMMAND CARD/, "\nPC COMMAND CARD")
     );
 
-    // Normalize point-cost lines
+    // Normalize cost lines
     lines = lines.map(line => {
 
         const match = line.match(/^(\d+)\s+(.*)$/);
@@ -119,38 +107,28 @@ function formatList(text) {
 
     });
 
-    // Wrap with Discord code block
+    // Discord code block
     if (lines.length > 0) {
-
         lines[0] = "```" + lines[0].trim().toUpperCase();
         lines[lines.length - 1] += "```";
-
     }
 
     return lines.join("\n");
-
 }
 
 formatBtn.addEventListener("click", () => {
-
     output.value = formatList(input.value);
-
 });
 
 copyBtn.addEventListener("click", async () => {
 
     try {
-
         await navigator.clipboard.writeText(output.value);
-
         showToast("Copied to clipboard");
-
-    } catch (err) {
-
+    }
+    catch (err) {
         console.error(err);
-
         showToast("Failed to copy");
-
     }
 
 });

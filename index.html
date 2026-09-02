@@ -3,24 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warmachine Formatter</title>
+    <title>Warmachine List Formatter</title>
 
     <link rel="stylesheet" href="style.css">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 </head>
 <body>
 
-    <h1>Warmachine Formatter</h1>
+<div class="container">
 
-    <h3>Input</h3>
-    <textarea id="input"></textarea>
+    <h1>Warmachine List Formatter</h1>
 
-    <button id="formatBtn">Format</button>
-    <button id="copyBtn">Copy Result</button>
+    <p class="subtitle">
+        Paste your list, format it and copy the result.
+    </p>
 
-    <h3>Output</h3>
-    <textarea id="output" readonly></textarea>
+    <div class="card">
 
-    <script src="script.js"></script>
+        <label for="input">Input</label>
+
+        <textarea
+                id="input"
+                placeholder="Paste your Warmachine list here..."></textarea>
+
+        <div class="buttons">
+
+            <button id="formatBtn" class="primary">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Format
+            </button>
+
+            <button id="copyBtn">
+                <i class="fa-regular fa-copy"></i>
+                Copy Result
+            </button>
+
+        </div>
+
+        <label for="output">Output</label>
+
+        <textarea
+                id="output"
+                readonly></textarea>
+
+    </div>
+
+</div>
+
+<div id="toast" class="toast">
+    Copied to clipboard
+</div>
+
+<script src="script.js"></script>
 
 </body>
 </html>

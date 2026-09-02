@@ -39,9 +39,6 @@ function formatList(text) {
     // Normalize spaces
     lines = lines.map(line => line.replace(/[ \t]+/g, " "));
 
-    // Remove SPELL lines
-    lines = lines.filter(line => !line.trim().startsWith("SPELL"));
-
     // Remove battlefield objects
     const removeWords = [
         "Heavy Weapon Crate",
@@ -65,28 +62,6 @@ function formatList(text) {
         }
 
         return true;
-    });
-
-    // DEFENSE 1 -
-    lines = lines.map(line =>
-        line.replace(/^\s*DEFENSE\s+1\s*-/, " ")
-    );
-
-    // First Defenses
-    let defenseDone = false;
-
-    lines = lines.map(line => {
-
-        if (!defenseDone && line.trim().startsWith("Defenses")) {
-
-            defenseDone = true;
-
-            return "\nDEFENSES" + line.trim().substring("Defenses".length);
-
-        }
-
-        return line;
-
     });
 
     // PC COMMAND CARD

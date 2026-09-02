@@ -52,12 +52,26 @@ function formatList(text) {
         !/^\s*SPELL/.test(line)
     );
 
-    // Remove crates and battlefield objects
-    const removePattern = /^\s*(Heavy Weapon Crate \d+|HEAVY WEAPON -.*|Blocker \d+|Skirmisher \d+|Raider \d+|Ammo Crate \d+|Medical Crate \d+|Mantlet \d+|Fuel Canister \d+)$/;
+    // Remove battlefield objects
+    const removable = [
+        "Heavy Weapon Crate",
+        "HEAVY WEAPON -",
+        "Blocker",
+        "Skirmisher",
+        "Raider",
+        "Ammo Crate",
+        "Medical Crate",
+        "Mantlet",
+        "Fuel Canister"
+    ];
 
-    lines = lines.filter(line =>
-        !removePattern.test(line)
-    );
+    lines = lines.filter(line => {
+
+        const trimmed = line.trim();
+
+        return !removable.some(item => trimmed.startsWith(item));
+
+    });
 
     // Replace DEFENSE 1 -
     lines = lines.map(line =>
@@ -109,9 +123,7 @@ function formatList(text) {
     if (lines.length > 0) {
 
         lines[0] = "```" + lines[0].trim().toUpperCase();
-
-        lines[lines.length - 1] =
-            lines[lines.length - 1] + "```";
+        lines[lines.length - 1] += "```";
 
     }
 
@@ -133,8 +145,7 @@ copyBtn.addEventListener("click", async () => {
 
         showToast("Copied to clipboard");
 
-    }
-    catch (err) {
+    } catch (err) {
 
         console.error(err);
 

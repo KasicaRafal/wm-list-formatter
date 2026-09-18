@@ -35,18 +35,49 @@
                 Format
             </button>
 
-            <button id="copyBtn">
-                <i class="fa-regular fa-copy"></i>
-                Copy Result
-            </button>
-
         </div>
 
-        <label for="output">Output</label>
+        <div class="outputs">
 
-        <textarea
-                id="output"
-                readonly></textarea>
+            <div class="output-section">
+
+                <div class="output-header">
+                    <label for="output">Output</label>
+                </div>
+
+                <textarea
+                        id="output"
+                        readonly></textarea>
+
+                <button id="copyBtn">
+                    <i class="fa-regular fa-copy"></i>
+                    Copy Result
+                </button>
+
+            </div>
+
+            <div class="output-section">
+
+                <div class="output-header tooltip-container">
+                    <label for="outputWT">Output for WT</label>
+
+                    <span class="tooltip">
+                        For Krystian, because copying without apostrophes is hard, apparently
+                    </span>
+                </div>
+
+                <textarea
+                        id="outputWT"
+                        readonly></textarea>
+
+                <button id="copyWTBtn">
+                    <i class="fa-regular fa-copy"></i>
+                    Copy result for WT
+                </button>
+
+            </div>
+
+        </div>
 
     </div>
 

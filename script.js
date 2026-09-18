@@ -24,11 +24,18 @@ function showToast(message) {
 }
 
 
-function formatList(text, discordFormatting = true) {
+/*
+ * NORMAL OUTPUT
+ *
+ * This is the original formatter.
+ */
+
+function formatList(text) {
 
     let lines = text.split(/\r?\n/);
 
     // Remove everything before and including "PC CARD"
+
     let cutoff = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -39,8 +46,11 @@ function formatList(text, discordFormatting = true) {
             stripped === "PC CARD" ||
             stripped === "PC      CARD"
         ) {
+
             cutoff = i + 1;
+
             break;
+
         }
 
     }
@@ -48,19 +58,25 @@ function formatList(text, discordFormatting = true) {
     lines = lines.slice(cutoff);
 
     // Remove blank lines
-    lines = lines.filter(line => line.trim() !== "");
+
+    lines = lines.filter(line =>
+        line.trim() !== ""
+    );
 
     // Normalize spaces
+
     lines = lines.map(line =>
         line.replace(/[ \t]+/g, " ")
     );
 
     // Remove SPELL lines
+
     lines = lines.filter(line =>
         !line.trim().startsWith("SPELL")
     );
 
     // Remove battlefield objects
+
     const removeWords = [
         "Heavy Weapon Crate",
         "HEAVY WEAPON -",
@@ -90,6 +106,7 @@ function formatList(text, discordFormatting = true) {
     });
 
     // Replace DEFENSE 1 -
+
     lines = lines.map(line =>
         line.replace(
             /^\s*DEFENSE\s+1\s*-/,
@@ -98,6 +115,7 @@ function formatList(text, discordFormatting = true) {
     );
 
     // First "Defenses"
+
     let defenseDone = false;
 
     lines = lines.map(line => {
@@ -119,6 +137,7 @@ function formatList(text, discordFormatting = true) {
     });
 
     // PC COMMAND CARD
+
     lines = lines.map(line =>
         line.replace(
             /^PC COMMAND CARD/,
@@ -127,6 +146,7 @@ function formatList(text, discordFormatting = true) {
     );
 
     // Normalize cost lines
+
     lines = lines.map(line => {
 
         const match = line.match(/^(\d+)\s+(.*)$/);
@@ -140,7 +160,8 @@ function formatList(text, discordFormatting = true) {
     });
 
     // Discord formatting
-    if (discordFormatting && lines.length > 0) {
+
+    if (lines.length > 0) {
 
         lines[0] =
             "```" +
@@ -155,17 +176,198 @@ function formatList(text, discordFormatting = true) {
 }
 
 
+/*
+ * WT OUTPUT
+ *
+ * Keeps the ENTIRE original input exactly as-is,
+ * except:
+ *
+ * - only first 2 of each battlefield object type
+ *   are kept
+ * - Heavy Weapon line belonging to a removed
+ *   Heavy Weapon Crate is also removed
+ * - blank lines belonging to removed objects
+ *   are removed
+ *
+ * No space normalization.
+ * No indentation changes.
+ * No Discord formatting.
+ */
+
+function formatWT(text) {
+
+    const lines = text.split(/\r?\n/);
+
+    const counts = {};
+
+    const result = [];
+
+    let skipBlankLines = false;
+    let removeHeavyWeapon = false;
+
+
+    for (let i = 0; i < lines.length; i++) {
+
+        const line = lines[i];
+        const t = line.trim();
+
+
+        /*
+         * If the previous object was removed,
+         * remove all blank lines until the next
+         * actual line.
+         */
+
+        if (skipBlankLines) {
+
+            if (t === "") {
+                continue;
+            }
+
+            skipBlankLines = false;
+
+        }
+
+
+        /*
+         * Heavy Weapon Crate
+         */
+
+        if (t.includes("Heavy Weapon Crate")) {
+
+            counts["Heavy Weapon Crate"] =
+                (counts["Heavy Weapon Crate"] || 0) + 1;
+
+
+            if (counts["Heavy Weapon Crate"] <= 2) {
+
+                result.push(line);
+
+                removeHeavyWeapon = false;
+
+            }
+            else {
+
+                removeHeavyWeapon = true;
+
+                skipBlankLines = true;
+
+            }
+
+            continue;
+
+        }
+
+
+        /*
+         * HEAVY WEAPON belongs to the
+         * preceding Heavy Weapon Crate.
+         */
+
+        if (t.includes("HEAVY WEAPON -")) {
+
+            if (!removeHeavyWeapon) {
+                result.push(line);
+            }
+
+            continue;
+
+        }
+
+
+        /*
+         * Identify battlefield object type.
+         */
+
+        let objectType = null;
+
+
+        if (t.includes("Blocker")) {
+
+            objectType = "Blocker";
+
+        }
+        else if (t.includes("Skirmisher")) {
+
+            objectType = "Skirmisher";
+
+        }
+        else if (t.includes("Raider")) {
+
+            objectType = "Raider";
+
+        }
+        else if (t.includes("Ammo Crate")) {
+
+            objectType = "Ammo Crate";
+
+        }
+        else if (t.includes("Medical Crate")) {
+
+            objectType = "Medical Crate";
+
+        }
+        else if (t.includes("Mantlet")) {
+
+            objectType = "Mantlet";
+
+        }
+        else if (t.includes("Fuel Canister")) {
+
+            objectType = "Fuel Canister";
+
+        }
+
+
+        /*
+         * Keep only first 2 of each type.
+         */
+
+        if (objectType !== null) {
+
+            counts[objectType] =
+                (counts[objectType] || 0) + 1;
+
+
+            if (counts[objectType] <= 2) {
+
+                result.push(line);
+
+            }
+            else {
+
+                skipBlankLines = true;
+
+            }
+
+            continue;
+
+        }
+
+
+        /*
+         * Everything else is copied EXACTLY.
+         */
+
+        result.push(line);
+
+    }
+
+
+    return result.join("\n");
+
+}
+
+
 /* Format */
 
 formatBtn.addEventListener("click", () => {
 
     const text = input.value;
 
-    // Normal output - Discord formatting
-    output.value = formatList(text, true);
+    output.value = formatList(text);
 
-    // WT output - no Discord backticks
-    outputWT.value = formatList(text, false);
+    outputWT.value = formatWT(text);
 
 });
 
@@ -176,7 +378,9 @@ copyBtn.addEventListener("click", async () => {
 
     try {
 
-        await navigator.clipboard.writeText(output.value);
+        await navigator.clipboard.writeText(
+            output.value
+        );
 
         showToast("Copied to clipboard");
 
@@ -198,7 +402,9 @@ copyWTBtn.addEventListener("click", async () => {
 
     try {
 
-        await navigator.clipboard.writeText(outputWT.value);
+        await navigator.clipboard.writeText(
+            outputWT.value
+        );
 
         showToast("WT result copied to clipboard");
 

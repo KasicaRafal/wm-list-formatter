@@ -71,25 +71,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 async function handleSlashFormat(interaction) {
-    const pasted = interaction.options.getString("list");
     const attachment = interaction.options.getAttachment("file");
     const includeWT = interaction.options.getBoolean("include_wt") === true;
 
-    const hasPaste = pasted !== null && pasted.trim() !== "";
-
-    // Default: no list/file → paste modal (primary UX).
-    if (!hasPaste && !attachment) {
+    // Default path: no file → open paste modal immediately.
+    // include_wt alone must not block the modal.
+    if (!attachment) {
         await interaction.showModal(buildPasteModal(includeWT));
         return;
     }
 
     await interaction.deferReply();
-
-    // Paste/list wins when both are provided; file is only a fallback for long lists.
-    const listText = hasPaste
-        ? pasted
-        : await readAttachment(attachment);
-
+    const listText = await readAttachment(attachment);
     await replyFormatted(interaction, listText, includeWT);
 }
 
@@ -109,7 +102,7 @@ async function handleContextFormat(interaction) {
 function buildPasteModal(includeWT = false) {
     const input = new TextInputBuilder()
         .setCustomId(MODAL_FIELD_ID)
-        .setLabel("Warmachine list / Lista Warmachine")
+        .setLabel("Warmachine list")
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
         .setMinLength(1)
@@ -132,11 +125,10 @@ async function replyFormatted(interaction, listText, includeWT = false) {
                     "No list text found.",
                     "",
                     "**How to use /format**",
-                    "• `/format` alone → paste box (default)",
-                    "• Or fill the **`list`** option (name is `list`, not `lista`)",
-                    "• Optional: **`file`** `.txt` only if paste is too long",
+                    "• `/format` → paste box opens (default)",
+                    "• Optional: attach a `.txt` with **`file`** if paste is too long",
                     "• Optional: **`include_wt: True`** to also get Output for WT",
-                    "• Or right‑click a message → **Apps → Format list**"
+                    "• Or right-click a message → **Apps → Format list**"
                 ].join("\n")
         });
         return;

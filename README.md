@@ -11,9 +11,9 @@ Formatting logic lives in `formatter.js` and is shared by the web UI and the bot
 
 ## Discord bot setup
 
-It replies with the main formatted **Output** (one message, or a `.txt` if too long). Set optional `include_wt: True` if you also want **Output for WT**.
+The bot adds `/format` (paste modal by default) and a **Format list** message context menu. It replies with one main formatted **Output** message (or a `.txt` if too long). Optional `include_wt: True` also sends **Output for WT**.
 
-English replies and the `/format` command name match the web UI. The option name is always `list` (not `lista`) — Discord does not allow option aliases.
+English command/option names and descriptions.
 
 ### What you need from the Discord Developer Portal
 
@@ -109,9 +109,9 @@ npm run register
 npm start
 ```
 
-- `npm run register` pushes `/format` and **Format list** to Discord (guild or global, depending on `GUILD_ID`).
+- `npm run register` clears and re-pushes `/format` + **Format list** (guild or global, depending on `GUILD_ID`).
 - `npm start` keeps the bot online. Leave this terminal running.
-- In Discord, type `/format` alone to open the paste box (default), or optionally fill `list`. Use `file` only if paste is too long.
+- In Discord, type `/format` alone → paste box. Optional `file` for long `.txt` lists.
 
 #### 8. Smoke-test the shared formatter (no Discord account needed)
 
@@ -126,24 +126,18 @@ npm run test:formatter
 
 **Default (paste):**
 
-1. Type `/format` with no options → Send
+1. Type `/format` with **no options** → Send
 2. Paste box opens → paste the list → Submit
 
-**Also fine:**
+**Optional (long lists only):** `/format` + `file` (attach `.txt`)
 
-```
-/format list:<paste list here>     # option name must be "list" (not "lista")
-```
+**Optional WT:** `/format` + `include_wt: True` (still opens the paste box if no file)
 
-**Optional (only if paste is too long):** attach a `.txt` with the `file` option. There is no separate file command.
+**From a chat message:** right-click → **Apps → Format list**
 
-**Optional WT:** set `include_wt: True` to also receive Output for WT (off by default).
+**Reply shape:** one message with the main formatted Output. WT only when `include_wt` is true.
 
-**From a chat message:** right‑click the message → **Apps → Format list**.
-
-**Reply shape:** one message with the main formatted Output. WT is only added when `include_wt` is true.
-
-**Limits:** paste modal ≤4000 chars; slash `list` option ≤6000. Longer than that → optional `file` (`.txt`).
+**Limits:** paste modal ≤4000 chars. Longer → optional `file` (`.txt`).
 
 ---
 

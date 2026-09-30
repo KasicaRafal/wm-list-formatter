@@ -17,13 +17,25 @@ const rest = new REST({ version: "10" }).setToken(token);
 
 try {
     if (guildId) {
+        // Clear first so Discord clients drop any stale required options
+        // (e.g. old `list` / localized "lista" schema).
+        console.log(`Clearing guild commands for ${guildId}…`);
+        await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+            body: []
+        });
+
         console.log(`Registering commands for guild ${guildId}…`);
         await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
             body: commandDefinitions
         });
         console.log(
-            "Guild commands registered (appear almost immediately):",
-            commandDefinitions.map((c) => c.name).join(", ")
+            "Guild commands registered:",
+            commandDefinitions.map((c) => {
+                const opts = (c.options || [])
+                    .map((o) => `${o.name}(required=${Boolean(o.required)})`)
+                    .join(", ");
+                return opts ? `${c.name} [${opts}]` : c.name;
+            }).join("; ")
         );
     } else {
         console.log("Registering commands globally…");
@@ -31,7 +43,7 @@ try {
             body: commandDefinitions
         });
         console.log(
-            "Global commands registered (may take up to ~1 hour to appear everywhere):",
+            "Global commands registered (may take up to ~1 hour):",
             commandDefinitions.map((c) => c.name).join(", ")
         );
     }

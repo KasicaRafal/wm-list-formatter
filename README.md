@@ -111,7 +111,7 @@ npm start
 
 - `npm run register` pushes `/format` and **Format list** to Discord (guild or global, depending on `GUILD_ID`).
 - `npm start` keeps the bot online. Leave this terminal running.
-- In Discord, type `/format` with **no options** to open a paste box, or fill `list` / attach a `.txt` via `file`.
+- In Discord, type `/format` alone to open the paste box (default), or optionally fill `list`. Use `file` only if paste is too long.
 
 #### 8. Smoke-test the shared formatter (no Discord account needed)
 
@@ -124,21 +124,20 @@ npm run test:formatter
 
 ### Bot usage
 
-**Recommended (most lists):**
+**Default (paste):**
 
-1. Type `/format` and **do not fill any options** → Send
-2. A paste box opens → paste the full list → Submit
+1. Type `/format` with no options → Send
+2. Paste box opens → paste the list → Submit
 
-**Other ways:**
+**Also fine:**
 
 ```
 /format list:<paste list here>     # option name must be "list" (not "lista")
-/format file:<attach .txt>         # best for very long lists (>~4000 characters)
 ```
 
-If both `list` and `file` are present, the attached file is used.
+**Optional (only if paste is too long):** attach a `.txt` with the `file` option. There is no separate file command.
 
-**From a chat message:** paste the list as a normal message → right‑click the message → **Apps → Format list**.
+**From a chat message:** right‑click the message → **Apps → Format list**.
 
 Replies:
 
@@ -147,7 +146,7 @@ Replies:
 
 If a result is longer than Discord’s message limit (2000 characters), the bot sends it as a `.txt` file attachment instead.
 
-**Limits:** Discord caps the slash `list` option at 6000 characters and the paste-box modal at 4000. Longer lists → use the `file` (`.txt`) option.
+**Limits:** paste modal ≤4000 chars; slash `list` option ≤6000. Longer than that → optional `file` (`.txt`).
 
 ---
 

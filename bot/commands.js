@@ -12,13 +12,13 @@ export const commandDefinitions = [
     new SlashCommandBuilder()
         .setName("format")
         .setDescription(
-            "Format a Warmachine list. Leave options empty to open a paste box."
+            "Format a Warmachine list. Run alone to paste, or use list."
         )
         .addStringOption((option) =>
             option
                 .setName("list")
                 .setDescription(
-                    "Paste here / Wklej tutaj (name is list, not lista). Long? use file"
+                    "Paste list here / Wklej listę tutaj (option name: list)"
                 )
                 .setRequired(false)
                 .setMaxLength(6000)
@@ -27,7 +27,7 @@ export const commandDefinitions = [
             option
                 .setName("file")
                 .setDescription(
-                    "Attach .txt for long lists / Załącz .txt przy długiej liście"
+                    "Optional .txt if paste too long / Opcj. .txt gdy za długa"
                 )
                 .setRequired(false)
         )

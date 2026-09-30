@@ -72,18 +72,20 @@ async function handleSlashFormat(interaction) {
     const pasted = interaction.options.getString("list");
     const attachment = interaction.options.getAttachment("file");
 
-    // No options → open paste modal (helps when users type wrong option names
-    // like "lista", or skip options entirely).
-    if (!attachment && (pasted === null || pasted.trim() === "")) {
+    const hasPaste = pasted !== null && pasted.trim() !== "";
+
+    // Default: no list/file → paste modal (primary UX).
+    if (!hasPaste && !attachment) {
         await interaction.showModal(buildPasteModal());
         return;
     }
 
     await interaction.deferReply();
 
-    const listText = attachment
-        ? await readAttachment(attachment)
-        : pasted;
+    // Paste/list wins when both are provided; file is only a fallback for long lists.
+    const listText = hasPaste
+        ? pasted
+        : await readAttachment(attachment);
 
     await replyFormatted(interaction, listText);
 }
@@ -109,7 +111,7 @@ function buildPasteModal() {
         .setMinLength(1)
         .setMaxLength(MODAL_MAX_LENGTH)
         .setPlaceholder(
-            `Paste list here. Max ${MODAL_MAX_LENGTH} chars — longer lists: /format + file (.txt)`
+            `Paste your list here (max ${MODAL_MAX_LENGTH} chars)`
         );
 
     return new ModalBuilder()
@@ -126,10 +128,10 @@ async function replyFormatted(interaction, listText) {
                     "No list text found.",
                     "",
                     "**How to use /format**",
-                    "• `/format` with no options → paste box opens (best for most lists)",
-                    "• Or fill the **`list`** option (exact name: `list`, not `lista`)",
-                    "• For very long lists: attach a **`.txt`** via the **`file`** option",
-                    "• Or paste the list as a normal message → right‑click → **Apps → Format list**"
+                    "• `/format` alone → paste box (default)",
+                    "• Or fill the **`list`** option (name is `list`, not `lista`)",
+                    "• Optional: **`file`** `.txt` only if paste is too long",
+                    "• Or right‑click a message → **Apps → Format list**"
                 ].join("\n")
         });
         return;

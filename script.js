@@ -4,6 +4,7 @@ const output = document.getElementById("output");
 const outputWT = document.getElementById("outputWT");
 
 const formatBtn = document.getElementById("formatBtn");
+const clearBtn = document.getElementById("clearBtn");
 
 const copyBtn = document.getElementById("copyBtn");
 const copyWTBtn = document.getElementById("copyWTBtn");
@@ -368,6 +369,19 @@ formatBtn.addEventListener("click", () => {
     output.value = formatList(text);
 
     outputWT.value = formatWT(text);
+
+});
+
+
+/* Clear all fields */
+
+clearBtn.addEventListener("click", () => {
+
+    input.value = "";
+    output.value = "";
+    outputWT.value = "";
+
+    showToast("All fields cleared");
 
 });
 

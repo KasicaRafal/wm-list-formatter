@@ -9,9 +9,7 @@ import {
  * - No required options
  * - Run alone → bot opens paste modal
  * - Optional `file` for long lists
- * - Optional `include_wt` (default false)
- *
- * Text paste is modal-only (no `list` slash option).
+ * - Reply = main formatted Output only (no WT on Discord)
  */
 export const commandDefinitions = [
     new SlashCommandBuilder()
@@ -21,12 +19,6 @@ export const commandDefinitions = [
             option
                 .setName("file")
                 .setDescription("Optional .txt attachment if the list is too long to paste")
-                .setRequired(false)
-        )
-        .addBooleanOption((option) =>
-            option
-                .setName("include_wt")
-                .setDescription("Also send Output for WT (default: false)")
                 .setRequired(false)
         )
         .toJSON(),

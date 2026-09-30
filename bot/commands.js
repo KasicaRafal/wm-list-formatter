@@ -31,6 +31,14 @@ export const commandDefinitions = [
                 )
                 .setRequired(false)
         )
+        .addBooleanOption((option) =>
+            option
+                .setName("include_wt")
+                .setDescription(
+                    "Also send Output for WT (default: no) / Też Output for WT"
+                )
+                .setRequired(false)
+        )
         .toJSON(),
     new ContextMenuCommandBuilder()
         .setName("Format list")

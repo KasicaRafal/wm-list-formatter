@@ -13,6 +13,7 @@ import { formatList, formatWT } from "../formatter.js";
 
 const DISCORD_MESSAGE_LIMIT = 2000;
 const MODAL_ID = "format-list-modal";
+const MODAL_ID_WT = "format-list-modal-wt";
 const MODAL_FIELD_ID = "list-text";
 /** Discord paragraph text-input max length. */
 const MODAL_MAX_LENGTH = 4000;
@@ -49,7 +50,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (
             interaction.isModalSubmit() &&
-            interaction.customId === MODAL_ID
+            (interaction.customId === MODAL_ID ||
+                interaction.customId === MODAL_ID_WT)
         ) {
             await handleModalFormat(interaction);
             return;
@@ -71,12 +73,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 async function handleSlashFormat(interaction) {
     const pasted = interaction.options.getString("list");
     const attachment = interaction.options.getAttachment("file");
+    const includeWT = interaction.options.getBoolean("include_wt") === true;
 
     const hasPaste = pasted !== null && pasted.trim() !== "";
 
     // Default: no list/file → paste modal (primary UX).
     if (!hasPaste && !attachment) {
-        await interaction.showModal(buildPasteModal());
+        await interaction.showModal(buildPasteModal(includeWT));
         return;
     }
 
@@ -87,22 +90,23 @@ async function handleSlashFormat(interaction) {
         ? pasted
         : await readAttachment(attachment);
 
-    await replyFormatted(interaction, listText);
+    await replyFormatted(interaction, listText, includeWT);
 }
 
 async function handleModalFormat(interaction) {
     await interaction.deferReply();
     const listText = interaction.fields.getTextInputValue(MODAL_FIELD_ID);
-    await replyFormatted(interaction, listText);
+    const includeWT = interaction.customId === MODAL_ID_WT;
+    await replyFormatted(interaction, listText, includeWT);
 }
 
 async function handleContextFormat(interaction) {
     await interaction.deferReply();
     const listText = interaction.targetMessage?.content ?? "";
-    await replyFormatted(interaction, listText);
+    await replyFormatted(interaction, listText, false);
 }
 
-function buildPasteModal() {
+function buildPasteModal(includeWT = false) {
     const input = new TextInputBuilder()
         .setCustomId(MODAL_FIELD_ID)
         .setLabel("Warmachine list / Lista Warmachine")
@@ -115,12 +119,12 @@ function buildPasteModal() {
         );
 
     return new ModalBuilder()
-        .setCustomId(MODAL_ID)
+        .setCustomId(includeWT ? MODAL_ID_WT : MODAL_ID)
         .setTitle("Format Warmachine list")
         .addComponents(new ActionRowBuilder().addComponents(input));
 }
 
-async function replyFormatted(interaction, listText) {
+async function replyFormatted(interaction, listText, includeWT = false) {
     if (!listText || !listText.trim()) {
         await interaction.editReply({
             content:
@@ -131,6 +135,7 @@ async function replyFormatted(interaction, listText) {
                     "• `/format` alone → paste box (default)",
                     "• Or fill the **`list`** option (name is `list`, not `lista`)",
                     "• Optional: **`file`** `.txt` only if paste is too long",
+                    "• Optional: **`include_wt: True`** to also get Output for WT",
                     "• Or right‑click a message → **Apps → Format list**"
                 ].join("\n")
         });
@@ -138,10 +143,16 @@ async function replyFormatted(interaction, listText) {
     }
 
     const output = formatList(listText);
-    const outputWT = formatWT(listText);
 
-    await sendLabeledResult(interaction, "Output", output, true);
-    await sendLabeledResult(interaction, "Output for WT", outputWT, false);
+    // Default: one message with the main formatted Output only.
+    if (!includeWT) {
+        await sendResult(interaction, output, true);
+        return;
+    }
+
+    const outputWT = formatWT(listText);
+    await sendResult(interaction, `**Output**\n${output}`, true);
+    await sendResult(interaction, `**Output for WT**\n${outputWT}`, false);
 }
 
 async function readAttachment(attachment) {
@@ -190,22 +201,19 @@ async function downloadAttachmentText(attachment) {
 }
 
 /**
- * Send one labeled result. Uses the initial reply for the first payload,
+ * Send one result. Uses the initial reply for the first payload,
  * then follow-ups. Long content is sent as a .txt attachment.
  */
-async function sendLabeledResult(interaction, label, content, isFirst) {
-    const header = `**${label}**\n`;
-    const combined = header + content;
+async function sendResult(interaction, content, isFirst) {
     const payload = {};
 
-    if (combined.length <= DISCORD_MESSAGE_LIMIT) {
-        payload.content = combined;
+    if (content.length <= DISCORD_MESSAGE_LIMIT) {
+        payload.content = content;
     } else {
-        const safeName = label.toLowerCase().replace(/\s+/g, "-");
         const file = new AttachmentBuilder(Buffer.from(content, "utf8"), {
-            name: `${safeName}.txt`
+            name: isFirst ? "output.txt" : "output-for-wt.txt"
         });
-        payload.content = `${header}_Too long for a Discord message — see attached file._`;
+        payload.content = "_Too long for a Discord message — see attached file._";
         payload.files = [file];
     }
 

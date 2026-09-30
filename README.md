@@ -11,7 +11,7 @@ Formatting logic lives in `formatter.js` and is shared by the web UI and the bot
 
 ## Discord bot setup
 
-The bot adds a `/format` slash command (and a **Format list** message context menu). It replies with the same two results as the web app: **Output** and **Output for WT**. Long replies are sent as `.txt` attachments.
+It replies with the main formatted **Output** (one message, or a `.txt` if too long). Set optional `include_wt: True` if you also want **Output for WT**.
 
 English replies and the `/format` command name match the web UI. The option name is always `list` (not `lista`) — Discord does not allow option aliases.
 
@@ -137,14 +137,11 @@ npm run test:formatter
 
 **Optional (only if paste is too long):** attach a `.txt` with the `file` option. There is no separate file command.
 
+**Optional WT:** set `include_wt: True` to also receive Output for WT (off by default).
+
 **From a chat message:** right‑click the message → **Apps → Format list**.
 
-Replies:
-
-1. **Output** — same as the web app’s main output (Discord code block)
-2. **Output for WT** — same as the web app’s WT output
-
-If a result is longer than Discord’s message limit (2000 characters), the bot sends it as a `.txt` file attachment instead.
+**Reply shape:** one message with the main formatted Output. WT is only added when `include_wt` is true.
 
 **Limits:** paste modal ≤4000 chars; slash `list` option ≤6000. Longer than that → optional `file` (`.txt`).
 

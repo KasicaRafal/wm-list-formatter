@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node index.js",
     "register": "node register-commands.js",
-    "test:formatter": "node test-formatter.js"
+    "test:formatter": "node test-formatter.js && node test-gravediggers-sample.js"
   },
   "engines": {
     "node": ">=18"

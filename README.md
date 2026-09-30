@@ -11,9 +11,9 @@ Formatting logic lives in `formatter.js` and is shared by the web UI and the bot
 
 ## Discord bot setup
 
-The bot adds a `/format` slash command. You can paste the list into the `list` option, or attach a `.txt` file with the `file` option when the list is too long. It replies with the same two results as the web app: **Output** and **Output for WT**. Long replies are sent as `.txt` attachments.
+The bot adds a `/format` slash command (and a **Format list** message context menu). It replies with the same two results as the web app: **Output** and **Output for WT**. Long replies are sent as `.txt` attachments.
 
-English replies and the `/format` command name match the web UI.
+English replies and the `/format` command name match the web UI. The option name is always `list` (not `lista`) — Discord does not allow option aliases.
 
 ### What you need from the Discord Developer Portal
 
@@ -25,7 +25,7 @@ You already have an application. You will copy **three** values (two required, o
 | `CLIENT_ID` | **General Information** → **Application ID** → **Copy** |
 | `GUILD_ID` (optional) | Your Discord server → right-click server name → **Copy Server ID** (needs Developer Mode) |
 
-No Privileged Gateway Intents are required for this bot (it only uses slash commands).
+No Privileged Gateway Intents are required for this bot (slash commands / modals / context menus).
 
 ---
 
@@ -109,9 +109,9 @@ npm run register
 npm start
 ```
 
-- `npm run register` pushes the `/format` command to Discord (guild or global, depending on `GUILD_ID`).
+- `npm run register` pushes `/format` and **Format list** to Discord (guild or global, depending on `GUILD_ID`).
 - `npm start` keeps the bot online. Leave this terminal running.
-- In Discord, type `/format` and either fill `list` or attach a `.txt` via `file`.
+- In Discord, type `/format` with **no options** to open a paste box, or fill `list` / attach a `.txt` via `file`.
 
 #### 8. Smoke-test the shared formatter (no Discord account needed)
 
@@ -124,12 +124,21 @@ npm run test:formatter
 
 ### Bot usage
 
+**Recommended (most lists):**
+
+1. Type `/format` and **do not fill any options** → Send
+2. A paste box opens → paste the full list → Submit
+
+**Other ways:**
+
 ```
-/format list:<paste list here>
-/format file:<attach .txt>
+/format list:<paste list here>     # option name must be "list" (not "lista")
+/format file:<attach .txt>         # best for very long lists (>~4000 characters)
 ```
 
-You can provide either option. If both are present, the attached file is used.
+If both `list` and `file` are present, the attached file is used.
+
+**From a chat message:** paste the list as a normal message → right‑click the message → **Apps → Format list**.
 
 Replies:
 
@@ -137,6 +146,8 @@ Replies:
 2. **Output for WT** — same as the web app’s WT output
 
 If a result is longer than Discord’s message limit (2000 characters), the bot sends it as a `.txt` file attachment instead.
+
+**Limits:** Discord caps the slash `list` option at 6000 characters and the paste-box modal at 4000. Longer lists → use the `file` (`.txt`) option.
 
 ---
 
@@ -147,7 +158,8 @@ If a result is longer than Discord’s message limit (2000 characters), the bot 
 | `index.html` / `style.css` / `script.js` | Web UI |
 | `formatter.js` | Shared formatting logic |
 | `bot/index.js` | Discord bot |
-| `bot/register-commands.js` | Registers `/format` |
+| `bot/commands.js` | Slash + context-menu definitions |
+| `bot/register-commands.js` | Registers Discord commands |
 | `bot/.env.example` | Env template (no secrets) |
 
 ---

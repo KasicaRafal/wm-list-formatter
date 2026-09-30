@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { REST, Routes, SlashCommandBuilder } from "discord.js";
+import { REST, Routes } from "discord.js";
+import { commandDefinitions } from "./commands.js";
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
@@ -12,41 +13,26 @@ if (!token || !clientId) {
     process.exit(1);
 }
 
-const commands = [
-    new SlashCommandBuilder()
-        .setName("format")
-        .setDescription("Format a Warmachine army list (Output + Output for WT)")
-        .addStringOption((option) =>
-            option
-                .setName("list")
-                .setDescription("Paste your list here (use file if it is too long)")
-                .setRequired(false)
-        )
-        .addAttachmentOption((option) =>
-            option
-                .setName("file")
-                .setDescription("Attach a .txt file when the list is too long to paste")
-                .setRequired(false)
-        )
-        .toJSON()
-];
-
 const rest = new REST({ version: "10" }).setToken(token);
 
 try {
     if (guildId) {
-        console.log(`Registering /format for guild ${guildId}…`);
+        console.log(`Registering commands for guild ${guildId}…`);
         await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
-            body: commands
-        });
-        console.log("Guild slash commands registered (appear almost immediately).");
-    } else {
-        console.log("Registering /format globally…");
-        await rest.put(Routes.applicationCommands(clientId), {
-            body: commands
+            body: commandDefinitions
         });
         console.log(
-            "Global slash commands registered (may take up to ~1 hour to appear everywhere)."
+            "Guild commands registered (appear almost immediately):",
+            commandDefinitions.map((c) => c.name).join(", ")
+        );
+    } else {
+        console.log("Registering commands globally…");
+        await rest.put(Routes.applicationCommands(clientId), {
+            body: commandDefinitions
+        });
+        console.log(
+            "Global commands registered (may take up to ~1 hour to appear everywhere):",
+            commandDefinitions.map((c) => c.name).join(", ")
         );
     }
 } catch (error) {

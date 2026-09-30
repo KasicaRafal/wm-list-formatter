@@ -1,0 +1,20 @@
+# Local Discord bot (recommended). Secrets stay in bot/.env — never commit it.
+#
+# From this directory (bot/):
+#   cp .env.example .env   # fill DISCORD_TOKEN, CLIENT_ID, optional GUILD_ID
+#   docker compose run --rm bot npm run register
+#   docker compose up -d
+#
+# Logs: docker compose logs -f
+# Stop: docker compose down
+
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: bot/Dockerfile
+    container_name: wm-list-formatter-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    # No ports published — the bot only makes outbound connections to Discord.

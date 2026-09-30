@@ -1,5 +1,7 @@
 # Host the Discord bot on Oracle Cloud Always Free ($0)
 
+> **Optional / deferred.** Recommended path right now is **local Docker** — see [`README.md`](README.md). Use this guide only if you later want 24/7 cloud hosting. Oracle is **not** required to run the bot.
+
 This guide is for a **brand-new** Oracle Cloud account. Follow the order below: signup → home region → budget safeguards → Always Free VM → install the bot. Do **not** create a VM until budgets/alerts are in place.
 
 Official Always Free limits change over time. Before you click Create, confirm shapes against Oracle’s docs: [Always Free Resources](https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm). As of late 2025 / 2026, typical Always Free compute is:

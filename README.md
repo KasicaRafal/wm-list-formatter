@@ -3,8 +3,8 @@
 Paste a Warmachine army list, format it, and copy the result.
 
 - **Web UI:** open `index.html` in a browser (or serve the repo folder statically).
-- **Discord bot:** see [Discord bot setup](#discord-bot-setup) below and [`bot/README.md`](bot/README.md).
-- **Host at $0 (Oracle Always Free):** [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md) — signup → home region → budget alert → Always Free VM → systemd.
+- **Discord bot (recommended: local Docker):** see [Discord bot setup](#discord-bot-setup) below and [`bot/README.md`](bot/README.md).
+- **Oracle Always Free (optional / deferred):** [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md) — not required; local Docker is enough for now.
 
 Formatting logic lives in `formatter.js` and is shared by the web UI and the bot.
 
@@ -97,20 +97,22 @@ GUILD_ID=paste_server_id_here
 
 Leave `GUILD_ID` empty only if you intentionally want global commands.
 
-#### 7. Install, register `/format`, and run
+#### 7. Register `/format` and run (Docker — recommended)
 
-Requires Node.js 18+.
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose).
 
 ```bash
 cd bot
-npm install
-npm run register
-npm start
+docker compose run --rm bot npm run register
+docker compose up -d
 ```
 
-- `npm run register` clears and re-pushes `/format` + **Format list** (guild or global, depending on `GUILD_ID`).
-- `npm start` keeps the bot online. Leave this terminal running.
+- `npm run register` (via Compose) clears and re-pushes `/format` + **Format list** (guild or global, depending on `GUILD_ID`).
+- `docker compose up -d` keeps the bot online in the background.
+- **Logs:** `docker compose logs -f` · **Stop:** `docker compose down`
 - In Discord, type `/format` alone → paste box. Optional `file` for long `.txt` lists.
+
+**Without Docker** (Node.js 18+): `cd bot && npm install && npm run register && npm start`.
 
 #### 8. Smoke-test the shared formatter (no Discord account needed)
 
@@ -147,17 +149,18 @@ npm run test:formatter
 | `bot/index.js` | Discord bot |
 | `bot/commands.js` | Slash + context-menu definitions |
 | `bot/register-commands.js` | Registers Discord commands |
+| `bot/Dockerfile` / `bot/docker-compose.yml` | Local Docker run (recommended) |
 | `bot/.env.example` | Env template (no secrets) |
 
 ---
 
-### Host on Oracle Cloud Always Free ($0)
+### Hosting (optional / deferred)
 
-To keep the bot online 24/7 at zero cost, use Oracle Cloud **Always Free** (Ampere A1 or AMD micro) and follow the from-zero guide:
+**Prefer local Docker for now.** Oracle Always Free is deferred and **not required**.
 
-**→ [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md)**
+If you later want 24/7 cloud hosting, the older guide is still here:
 
-Order matters: account signup → permanent home region → budget / $0 alert → only then create an Always Free-eligible VM → install Node + systemd. Stay-free pitfalls (paid shapes, extra volumes, paid IPs) are listed at the top of that doc.
+**→ [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md)** (optional)
 
 ### Security
 

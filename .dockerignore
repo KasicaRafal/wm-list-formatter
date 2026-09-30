@@ -1,0 +1,10 @@
+# Keep the image lean and never send secrets into the build context
+node_modules/
+bot/node_modules/
+.env
+bot/.env
+*.log
+.DS_Store
+.git/
+**/deploy/
+**/*.md

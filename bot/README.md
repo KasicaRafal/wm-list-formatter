@@ -4,18 +4,23 @@ Slash command `/format` (paste modal by default) and a **Format list** message c
 
 Shared formatting lives in repo-root [`formatter.js`](../formatter.js).
 
-## Quick start (local)
+## Recommended: run with Docker (local)
 
-Requires Node.js 18+.
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS) or Docker Engine + Compose (Linux).
 
 ```bash
 cd bot
 cp .env.example .env
-# Edit .env — see ../README.md#discord-bot-setup for Portal steps
-npm install
-npm run register
-npm start
+# Edit .env — DISCORD_TOKEN, CLIENT_ID, optional GUILD_ID
+# Portal steps: ../README.md#discord-bot-setup
+
+docker compose run --rm bot npm run register
+docker compose up -d
 ```
+
+- **Logs:** `docker compose logs -f`
+- **Stop:** `docker compose down`
+- Secrets stay in `bot/.env` (Compose `env_file`). Nothing is baked into the image.
 
 Env keys (no secrets in git):
 
@@ -27,19 +32,45 @@ Env keys (no secrets in git):
 
 Template: [`.env.example`](.env.example). Never commit `.env`.
 
-## Host on Oracle Cloud Always Free ($0)
+### Windows (PowerShell / CMD)
 
-Step-by-step from **zero account** → home region → budget safeguards → Always Free VM → systemd:
+Same commands from `bot\` after Docker Desktop is running. Example PowerShell:
 
-**→ [deploy-oracle-always-free.md](deploy-oracle-always-free.md)**
+```powershell
+cd bot
+copy .env.example .env
+# Edit .env in Notepad / your IDE, then:
+docker compose run --rm bot npm run register
+docker compose up -d
+```
 
-Example systemd unit: [`deploy/wm-list-formatter-bot.service`](deploy/wm-list-formatter-bot.service).
+## Optional: run with Node locally
+
+Requires Node.js 18+.
+
+```bash
+cd bot
+cp .env.example .env
+npm install
+npm run register
+npm start
+```
+
+## Hosting (optional / deferred)
+
+**Oracle Always Free is deferred** for now — prefer keeping the bot on your machine with Docker.
+
+The older guide remains for later if you want 24/7 cloud hosting:
+
+**→ [deploy-oracle-always-free.md](deploy-oracle-always-free.md)** (optional, not required)
+
+Example systemd unit (Oracle/VM path only): [`deploy/wm-list-formatter-bot.service`](deploy/wm-list-formatter-bot.service).
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
-| `npm start` | Run the bot |
+| `npm start` / Compose default | Run the bot |
 | `npm run register` | Clear + re-register `/format` and **Format list** |
 | `npm run test:formatter` | Offline formatter smoke tests |
 

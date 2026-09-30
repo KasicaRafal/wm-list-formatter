@@ -1,0 +1,11 @@
+# Secrets and local env
+.env
+bot/.env
+
+# Dependencies
+node_modules/
+bot/node_modules/
+
+# OS / editor
+.DS_Store
+*.log

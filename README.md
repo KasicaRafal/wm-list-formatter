@@ -3,7 +3,8 @@
 Paste a Warmachine army list, format it, and copy the result.
 
 - **Web UI:** open `index.html` in a browser (or serve the repo folder statically).
-- **Discord bot:** see [Discord bot setup](#discord-bot-setup) below.
+- **Discord bot:** see [Discord bot setup](#discord-bot-setup) below and [`bot/README.md`](bot/README.md).
+- **Host at $0 (Oracle Always Free):** [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md) — signup → home region → budget alert → Always Free VM → systemd.
 
 Formatting logic lives in `formatter.js` and is shared by the web UI and the bot.
 
@@ -149,6 +150,14 @@ npm run test:formatter
 | `bot/.env.example` | Env template (no secrets) |
 
 ---
+
+### Host on Oracle Cloud Always Free ($0)
+
+To keep the bot online 24/7 at zero cost, use Oracle Cloud **Always Free** (Ampere A1 or AMD micro) and follow the from-zero guide:
+
+**→ [`bot/deploy-oracle-always-free.md`](bot/deploy-oracle-always-free.md)**
+
+Order matters: account signup → permanent home region → budget / $0 alert → only then create an Always Free-eligible VM → install Node + systemd. Stay-free pitfalls (paid shapes, extra volumes, paid IPs) are listed at the top of that doc.
 
 ### Security
 

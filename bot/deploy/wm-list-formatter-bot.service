@@ -1,0 +1,18 @@
+[Unit]
+Description=Warmachine List Formatter Discord bot
+Documentation=https://github.com/KasicaRafal/wm-list-formatter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/wm-list-formatter/bot
+EnvironmentFile=/home/ubuntu/wm-list-formatter/bot/.env
+ExecStart=/usr/bin/node /home/ubuntu/wm-list-formatter/bot/index.js
+Restart=always
+RestartSec=5
+# Discord bots are outbound-only; no ports to open in this unit.
+
+[Install]
+WantedBy=multi-user.target

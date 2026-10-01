@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 
+import cv2
+import numpy as np
 import pymupdf
 from PIL import Image, ImageDraw, ImageFont
 
@@ -36,7 +38,7 @@ def render_card(background: Image.Image, grid: Grid) -> Image.Image:
     card = _cover(background, width, height).convert("RGBA")
     draw = ImageDraw.Draw(card)
     name_bottom = _draw_name(draw, card.size, grid.name)
-    _draw_grid(draw, grid, name_bottom + 18, width - 28, height - 22)
+    _draw_grid(card, draw, grid, name_bottom + 12, width - 28, height - 22)
     return card.convert("RGB")
 
 
@@ -76,39 +78,43 @@ def _fit_font(draw: ImageDraw.ImageDraw, text: str, max_width: int, start: int) 
     return ImageFont.truetype(_FONT, 22)
 
 
-def _draw_grid(draw: ImageDraw.ImageDraw, grid: Grid, top: int, right: int, bottom: int) -> None:
+def _draw_grid(card: Image.Image, draw: ImageDraw.ImageDraw, grid: Grid, top: int, right: int, bottom: int) -> None:
+    label_band = 42 if any(grid.column_labels) else 0
     x0, y0, x1, y1 = grid.bbox
     source_w = max(1, x1 - x0)
     source_h = max(1, y1 - y0)
     area_w = right - 28
-    area_h = bottom - top
+    area_h = bottom - top - label_band
     scale = min(area_w / source_w, area_h / source_h)
     drawn_w = source_w * scale
     drawn_h = source_h * scale
     origin_x = 28 + (area_w - drawn_w) / 2
-    origin_y = top + (area_h - drawn_h) / 2
+    origin_y = top + label_band + (area_h - drawn_h) / 2
 
-    def place(cell) -> tuple[float, float, float, float]:
+    def map_box(sx0: float, sy0: float, sx1: float, sy1: float) -> tuple[float, float, float, float]:
         return (
-            origin_x + (cell.x0 - x0) * scale,
-            origin_y + (cell.y0 - y0) * scale,
-            origin_x + (cell.x1 - x0) * scale,
-            origin_y + (cell.y1 - y0) * scale,
+            origin_x + (sx0 - x0) * scale,
+            origin_y + (sy0 - y0) * scale,
+            origin_x + (sx1 - x0) * scale,
+            origin_y + (sy1 - y0) * scale,
         )
 
-    if grid.kind == "spiral":
-        for cell in grid.cells:
-            _stroke_round(draw, place(cell), cell.color or (180, 40, 40))
+    if grid.kind == "spiral" and grid.sprite is not None:
+        _paste_sprite(card, grid.sprite, map_box(x0, y0, x1, y1))
         return
 
     for cell in grid.cells:
-        box = place(cell)
+        box = map_box(cell.x0, cell.y0, cell.x1, cell.y1)
         if cell.kind == "gray":
             _fill_box(draw, box, (150, 152, 156, 255))
         else:
             _stroke_box(draw, box, (28, 30, 34, 255))
-        if cell.kind == "letter" and cell.letter:
+        if cell.glyph is not None:
+            _paste_glyph(card, cell.glyph, box)
+        elif cell.kind == "letter" and cell.letter:
             _draw_letter(draw, box, cell.letter)
+    if any(grid.column_labels):
+        _draw_column_labels(draw, grid, map_box, label_band, origin_y)
 
 
 def _stroke_box(draw: ImageDraw.ImageDraw, box, color) -> None:
@@ -121,12 +127,65 @@ def _fill_box(draw: ImageDraw.ImageDraw, box, color) -> None:
     draw.rectangle(box, fill=color, outline=(40, 42, 46, 255), width=3)
 
 
-def _stroke_round(draw: ImageDraw.ImageDraw, box, color: tuple[int, int, int]) -> None:
+def _paste_sprite(card: Image.Image, sprite: np.ndarray, box: tuple[float, float, float, float]) -> None:
+    """Place the source spiral, with a thin light halo so branches stay readable."""
     x0, y0, x1, y1 = box
-    radius = max(4, int(min(x1 - x0, y1 - y0) * 0.22))
-    width = max(3, int(min(x1 - x0, y1 - y0) * 0.09))
-    draw.rounded_rectangle(box, radius=radius, outline=(255, 255, 255, 235), width=width + 3)
-    draw.rounded_rectangle(box, radius=radius, outline=color + (255,), width=width)
+    width = max(1, int(round(x1 - x0)))
+    height = max(1, int(round(y1 - y0)))
+    image = Image.fromarray(sprite, mode="RGBA")
+    image = image.resize((width, height), Image.Resampling.LANCZOS)
+    halo = _halo(np.asarray(image))
+    card.alpha_composite(Image.fromarray(halo, mode="RGBA"), (int(round(x0)), int(round(y0))))
+    card.alpha_composite(image, (int(round(x0)), int(round(y0))))
+
+
+def _halo(sprite: np.ndarray) -> np.ndarray:
+    alpha = sprite[:, :, 3]
+    dilated = cv2.dilate(alpha, np.ones((3, 3), np.uint8), iterations=1)
+    halo = np.zeros_like(sprite)
+    halo[:, :, :3] = 255
+    halo[:, :, 3] = np.where(dilated > 20, 180, 0).astype(np.uint8)
+    halo[:, :, 3] = np.minimum(halo[:, :, 3], 255 - alpha)
+    return halo
+
+
+def _paste_glyph(card: Image.Image, glyph: np.ndarray, box: tuple[float, float, float, float]) -> None:
+    x0, y0, x1, y1 = box
+    cell_w = x1 - x0
+    cell_h = y1 - y0
+    target_h = max(8, int(cell_h * 0.62))
+    aspect = glyph.shape[1] / max(1, glyph.shape[0])
+    target_w = max(6, int(target_h * aspect))
+    if target_w > cell_w * 0.9:
+        target_w = int(cell_w * 0.9)
+        target_h = max(8, int(target_w / max(aspect, 0.2)))
+    image = Image.fromarray(glyph, mode="RGBA").resize((target_w, target_h), Image.Resampling.NEAREST)
+    halo = _halo(np.asarray(image))
+    left = int(round(x0 + (cell_w - target_w) / 2))
+    top = int(round(y0 + (cell_h - target_h) / 2))
+    card.alpha_composite(Image.fromarray(halo, mode="RGBA"), (left, top))
+    card.alpha_composite(image, (left, top))
+
+
+def _draw_column_labels(draw, grid: Grid, map_box, _band: int, origin_y: float) -> None:
+    font = ImageFont.truetype(_FONT, 28)
+    by_col: dict[int, list] = {}
+    for cell in grid.cells:
+        by_col.setdefault(cell.col, []).append(cell)
+    for col, label in enumerate(grid.column_labels):
+        if not label or col not in by_col:
+            continue
+        group = by_col[col]
+        sx0 = min(cell.x0 for cell in group)
+        sx1 = max(cell.x1 for cell in group)
+        left, top, right, _bottom = map_box(sx0, group[0].y0, sx1, group[0].y1)
+        bbox = draw.textbbox((0, 0), label, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        x = (left + right - tw) / 2
+        y = origin_y - th - 8
+        draw.text((x + 1, y + 1), label, font=font, fill=(255, 255, 255, 230))
+        draw.text((x, y), label, font=font, fill=(20, 20, 22, 255))
 
 
 def _draw_letter(draw: ImageDraw.ImageDraw, box, letter: str) -> None:

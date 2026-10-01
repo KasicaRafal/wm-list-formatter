@@ -11,6 +11,7 @@ _FONT_CANDIDATES = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 )
 ALPHABET = "LMRCHSA"
+DIGITS = "123456789"
 
 
 def _load_font(size: int, path: str) -> ImageFont.FreeTypeFont:
@@ -50,31 +51,32 @@ def _render_char(ch: str, font: ImageFont.FreeTypeFont) -> np.ndarray | None:
     return _glyph_vector(dark)
 
 
-def _build_templates() -> dict[str, list[np.ndarray]]:
-    templates: dict[str, list[np.ndarray]] = {ch: [] for ch in ALPHABET}
+def _build_templates(alphabet: str) -> dict[str, list[np.ndarray]]:
+    templates: dict[str, list[np.ndarray]] = {ch: [] for ch in alphabet}
     for path in _FONT_CANDIDATES:
         try:
             for size in (42, 52, 64):
                 font = _load_font(size, path)
-                for ch in ALPHABET:
+                for ch in alphabet:
                     vec = _render_char(ch, font)
                     if vec is not None:
                         templates[ch].append(vec)
         except OSError:
             continue
     if not any(templates.values()):
-        raise RuntimeError("No fonts available for system-letter templates")
+        raise RuntimeError("No fonts available for glyph templates")
     return templates
 
 
-TEMPLATES = _build_templates()
+TEMPLATES = _build_templates(ALPHABET)
+DIGIT_TEMPLATES = _build_templates(DIGITS)
 
 
-def _score(vec: np.ndarray) -> tuple[str, float]:
+def _score_against(vec: np.ndarray, templates: dict[str, list[np.ndarray]], minimum: float) -> tuple[str, float]:
     best_ch = ""
     best = -1.0
     second = -1.0
-    for ch, variants in TEMPLATES.items():
+    for ch, variants in templates.items():
         score = max(float(vec @ variant) for variant in variants)
         if score > best:
             second = best
@@ -82,9 +84,13 @@ def _score(vec: np.ndarray) -> tuple[str, float]:
             best_ch = ch
         elif score > second:
             second = score
-    if best < 0.50 or best - second < 0.05:
+    if best < minimum or best - second < 0.05:
         return "", best
     return best_ch, best
+
+
+def _score(vec: np.ndarray) -> tuple[str, float]:
+    return _score_against(vec, TEMPLATES, 0.50)
 
 
 def _match_binary(binary: np.ndarray) -> tuple[str, float]:
@@ -94,23 +100,58 @@ def _match_binary(binary: np.ndarray) -> tuple[str, float]:
     return _score(vec)
 
 
+def read_digit(binary: np.ndarray) -> tuple[str, float]:
+    """Read one column number. The glyph stays above its own column."""
+    height, width = binary.shape[:2]
+    # The printed "1" is a narrow stem with a small flag. A proportional
+    # font template scores it like a "3", so the shape decides it.
+    if height >= 16 and 6 <= width <= height * 0.55 and int(binary.sum()) > 20:
+        return "1", 0.8
+    vec = _glyph_vector(binary)
+    if vec is None:
+        return "", 0.0
+    return _score_against(vec, DIGIT_TEMPLATES, 0.42)
+
+
+def _components(binary: np.ndarray) -> list[np.ndarray]:
+    """Side-by-side ink blobs inside one cell, left to right. Never a new column."""
+    import cv2
+
+    mask = binary.astype(np.uint8)
+    count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(mask, 8)
+    blobs = []
+    for index in range(1, count):
+        if int(stats[index, cv2.CC_STAT_AREA]) < 12:
+            continue
+        x = int(stats[index, cv2.CC_STAT_LEFT])
+        y = int(stats[index, cv2.CC_STAT_TOP])
+        w = int(stats[index, cv2.CC_STAT_WIDTH])
+        h = int(stats[index, cv2.CC_STAT_HEIGHT])
+        blobs.append((x, binary[y : y + h, x : x + w]))
+    blobs.sort(key=lambda item: item[0])
+    return [blob for _x, blob in blobs]
+
+
 def read_system_letters(interior: np.ndarray) -> tuple[str, float]:
-    """Return (letters, score) for one cell. Empty string if there is no confident glyph."""
+    """Read the glyph or glyphs that sit inside this one cell.
+
+    Two marks in the same box (LM, RR) stay on that cell. They are not
+    assigned to the neighboring column.
+    """
     dark = interior < 85
     if int(dark.sum()) < 14:
         return "", 0.0
     ys, xs = np.where(dark)
     binary = dark[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
-    height, width = binary.shape
-    if width > height * 1.35 and width >= 14:
-        column = binary.mean(axis=0)
-        left = max(2, width // 6)
-        right = min(width - 2, width - width // 6)
-        window = column[left:right]
-        if window.size and float(window.min()) < 0.08:
-            cut = left + int(np.argmin(window))
-            left_ch, left_score = _match_binary(binary[:, :cut])
-            right_ch, right_score = _match_binary(binary[:, cut:])
-            if left_ch and right_ch and min(left_score, right_score) >= 0.50:
-                return left_ch + right_ch, min(left_score, right_score)
+    parts = _components(binary)
+    if len(parts) >= 2:
+        letters = []
+        scores = []
+        for part in parts:
+            letter, score = _match_binary(part)
+            if letter:
+                letters.append(letter)
+                scores.append(score)
+        if len(letters) >= 2:
+            return "".join(letters), min(scores)
     return _match_binary(binary)

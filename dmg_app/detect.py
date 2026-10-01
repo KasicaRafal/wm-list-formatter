@@ -17,7 +17,7 @@ import pymupdf
 import pytesseract
 from PIL import Image
 
-from dmg_app.letters import read_system_letters
+from dmg_app.letters import read_digit, read_system_letters
 
 # A real lattice divider stays strong across the grid. The faint full-width
 # ruling on every card tops out lower, so it does not become a grid by itself.
@@ -34,9 +34,11 @@ class Cell:
     y0: int
     x1: int
     y1: int
-    kind: str  # open, gray, letter
+    kind: str  # open, gray, letter, spiral
     letter: str = ""
     color: tuple[int, int, int] | None = None
+    # Source ink for a system glyph, kept inside this cell (RGBA).
+    glyph: np.ndarray | None = None
 
 
 @dataclass
@@ -48,9 +50,17 @@ class Grid:
     cols: int
     source_index: int
     note: str = ""
+    column_labels: list[str] = field(default_factory=list)
+    # Colored spiral ink with white and the card ruling removed (RGBA).
+    sprite: np.ndarray | None = None
+    sprite_origin: tuple[int, int] = (0, 0)
 
     @property
     def bbox(self) -> tuple[int, int, int, int]:
+        if self.sprite is not None:
+            height, width = self.sprite.shape[:2]
+            x0, y0 = self.sprite_origin
+            return x0, y0, x0 + width, y0 + height
         x0 = min(c.x0 for c in self.cells)
         y0 = min(c.y0 for c in self.cells)
         x1 = max(c.x1 for c in self.cells)
@@ -124,7 +134,7 @@ def _analyze_card(rgb: np.ndarray, source_index: int):
         if body_end - body_top < 40:
             yield None, Skipped(name or "(blank)", "no room below the name for a grid", source_index)
             continue
-        spiral = _find_spiral(rgb, body_top, body_end)
+        spiral, sprite, origin = _find_spiral(rgb, body_top, body_end)
         lattice = _find_lattice(rgb, body_top, body_end)
         if spiral is not None and (lattice is None or len(spiral) >= 8):
             # A colored spiral is the beast grid. Do not also keep the card ruling.
@@ -135,6 +145,8 @@ def _analyze_card(rgb: np.ndarray, source_index: int):
                 rows=0,
                 cols=0,
                 source_index=source_index,
+                sprite=sprite,
+                sprite_origin=origin,
             )
             yield grid, None
             continue
@@ -309,6 +321,7 @@ def _find_lattice(rgb: np.ndarray, y0: int, y1: int) -> Grid | None:
             best_score = score
     if best is None or best_score < 1:
         return None
+    best.column_labels = _column_labels(gray, best.cells)
     return best
 
 
@@ -396,50 +409,103 @@ def _cells_from_runs(gray, y_origin, vrun, hrun) -> list[Cell] | None:
             x1 = int(right)
             if x1 - x0 < 18:
                 continue
-            kind, letter = _classify_box(gray[y0:y1, x0:x1])
-            cells.append(Cell(row, col, x0, y0, x1, y1, kind, letter))
+            kind, letter, glyph = _classify_box(gray[y0:y1, x0:x1])
+            cells.append(Cell(row, col, x0, y0, x1, y1, kind, letter, glyph=glyph))
     if len(cells) < 9:
         return None
     return cells
 
 
-def _classify_box(patch: np.ndarray) -> tuple[str, str]:
+def _classify_box(patch: np.ndarray) -> tuple[str, str, np.ndarray | None]:
     if patch.size == 0:
-        return "open", ""
+        return "open", "", None
     height, width = patch.shape
     iy = max(2, height // 7)
     ix = max(2, width // 7)
     interior = patch[iy : height - iy or None, ix : width - ix or None]
     if interior.size == 0:
         interior = patch
-    dark_n = int((interior < 85).sum())
+    dark = interior < 85
+    dark_n = int(dark.sum())
     gray_frac = float((interior < 178).mean())
     if dark_n >= 16:
         letter, score = read_system_letters(interior)
+        glyph = _glyph_sprite(dark)
         if letter and score >= 0.50:
-            return "letter", letter
-        # Ink is there, but the glyph is not a confident system letter.
-        # Leave the box open rather than inventing a character.
-        return "open", ""
+            return "letter", letter, glyph
+        # Ink is there, but it is not a confident system letter.
+        # Keep the ink in this cell rather than inventing a character.
+        if glyph is not None:
+            return "letter", "", glyph
+        return "open", "", None
     if gray_frac > 0.55:
-        return "gray", ""
-    return "open", ""
+        return "gray", "", None
+    return "open", "", None
 
 
-def _find_spiral(rgb: np.ndarray, y0: int, y1: int) -> list[Cell] | None:
+def _glyph_sprite(dark: np.ndarray) -> np.ndarray | None:
+    """Black ink of every mark in this cell, including a second glyph."""
+    if int(dark.sum()) < 12:
+        return None
+    ys, xs = np.where(dark)
+    sub = dark[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
+    sprite = np.zeros(sub.shape + (4,), np.uint8)
+    sprite[sub, 0] = 16
+    sprite[sub, 1] = 16
+    sprite[sub, 2] = 18
+    sprite[sub, 3] = 255
+    return sprite
+
+
+def _column_labels(gray: np.ndarray, cells: list[Cell]) -> list[str]:
+    """Digits printed above the lattice, one per column. 1 sits on column 1."""
+    cols = max(cell.col for cell in cells) + 1
+    top = min(cell.y0 for cell in cells)
+    labels: list[str] = []
+    for col in range(cols):
+        group = [cell for cell in cells if cell.col == col]
+        x0 = min(cell.x0 for cell in group)
+        x1 = max(cell.x1 for cell in group)
+        y1 = max(0, top - 2)
+        y0 = max(0, top - 88)
+        if y1 <= y0:
+            labels.append("")
+            continue
+        patch = gray[y0:y1, x0:x1]
+        dark = patch < 145
+        if int(dark.sum()) < 20:
+            labels.append("")
+            continue
+        ys, xs = np.where(dark)
+        glyph = dark[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
+        # A real column digit is a compact mark, not a slice of the box rule.
+        height, width = glyph.shape
+        if height < 12 or width < 4 or height > 50 or width > 40:
+            labels.append("")
+            continue
+        digit, score = read_digit(glyph)
+        labels.append(digit if digit and score >= 0.40 else "")
+    if sum(1 for label in labels if label) < 3:
+        return []
+    return labels
+
+
+def _find_spiral(
+    rgb: np.ndarray, y0: int, y1: int
+) -> tuple[list[Cell] | None, np.ndarray | None, tuple[int, int]]:
     roi = rgb[y0:y1]
     if roi.shape[0] < 40:
-        return None
+        return None, None, (0, 0)
     hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
     wall = ((hsv[:, :, 1] > 48) & (hsv[:, :, 2] > 25)).astype(np.uint8) * 255
     if int(wall.sum()) < 800:
-        return None
+        return None, None, (0, 0)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     wall = cv2.morphologyEx(wall, cv2.MORPH_OPEN, kernel)
     closed = cv2.morphologyEx(wall, cv2.MORPH_CLOSE, kernel, iterations=1)
     contours, hierarchy = cv2.findContours(closed, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
     if hierarchy is None:
-        return None
+        return None, None, (0, 0)
     found: list[tuple[int, int, int, int, tuple[int, int, int]]] = []
     for index, node in enumerate(hierarchy[0]):
         parent = int(node[3])
@@ -463,13 +529,13 @@ def _find_spiral(rgb: np.ndarray, y0: int, y1: int) -> list[Cell] | None:
             continue
         found.append((x, y, w, h, median))
     if len(found) < 8:
-        return None
+        return None, None, (0, 0)
     areas = np.array([w * h for _x, _y, w, h, _c in found], dtype=np.float32)
     median_area = float(np.median(areas))
     kept = [item for item in found if 0.45 * median_area <= item[2] * item[3] <= 1.9 * median_area]
     kept = _keep_branch_colors(kept)
     if len(kept) < 8:
-        return None
+        return None, None, (0, 0)
     cells: list[Cell] = []
     for index, (x, y, w, h, color) in enumerate(sorted(kept, key=lambda item: (item[1], item[0]))):
         pad = 3
@@ -492,7 +558,25 @@ def _find_spiral(rgb: np.ndarray, y0: int, y1: int) -> list[Cell] | None:
         cells[-1].y0 = max(0, y0 + y - pad)
         cells[-1].x1 = x + w + pad
         cells[-1].y1 = y0 + y + h + pad
-    return cells
+    sprite, origin = _spiral_sprite(rgb, cells)
+    return cells, sprite, origin
+
+
+def _spiral_sprite(rgb: np.ndarray, cells: list[Cell]) -> tuple[np.ndarray, tuple[int, int]]:
+    """Colored circles and branch strokes only. White card and gray ruling drop out."""
+    pad = 14
+    x0 = max(0, min(cell.x0 for cell in cells) - pad)
+    y0 = max(0, min(cell.y0 for cell in cells) - pad)
+    x1 = min(rgb.shape[1], max(cell.x1 for cell in cells) + pad)
+    y1 = min(rgb.shape[0], max(cell.y1 for cell in cells) + pad)
+    crop = rgb[y0:y1, x0:x1]
+    hsv = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)
+    sat = hsv[:, :, 1].astype(np.float32)
+    alpha = np.clip((sat - 20.0) / 50.0, 0.0, 1.0)
+    sprite = np.zeros(crop.shape[:2] + (4,), np.uint8)
+    sprite[:, :, :3] = crop
+    sprite[:, :, 3] = (alpha * 255).astype(np.uint8)
+    return sprite, (x0, y0)
 
 
 def _saturation(color: tuple[int, int, int]) -> int:

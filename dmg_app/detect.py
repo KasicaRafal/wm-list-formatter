@@ -563,20 +563,98 @@ def _find_spiral(
 
 
 def _spiral_sprite(rgb: np.ndarray, cells: list[Cell]) -> tuple[np.ndarray, tuple[int, int]]:
-    """Colored circles and branch strokes only. White card and gray ruling drop out."""
-    pad = 14
+    """Colored circles, the pale arm that joins them, and the gray branch numbers.
+
+    Ring outlines are saturated. The green arm is a lighter stroke of the same
+    hue, and the digits 1–6 beside the arms are nearly gray. Both are already
+    in the bitmap. This does not draw a new ring or a new numeral.
+    """
+    pad = 120
     x0 = max(0, min(cell.x0 for cell in cells) - pad)
     y0 = max(0, min(cell.y0 for cell in cells) - pad)
     x1 = min(rgb.shape[1], max(cell.x1 for cell in cells) + pad)
     y1 = min(rgb.shape[0], max(cell.y1 for cell in cells) + pad)
     crop = rgb[y0:y1, x0:x1]
-    hsv = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)
-    sat = hsv[:, :, 1].astype(np.float32)
-    alpha = np.clip((sat - 20.0) / 50.0, 0.0, 1.0)
-    sprite = np.zeros(crop.shape[:2] + (4,), np.uint8)
-    sprite[:, :, :3] = crop
-    sprite[:, :, 3] = (alpha * 255).astype(np.uint8)
-    return sprite, (x0, y0)
+    branch = _branch_pixels(crop, _ring_mask(crop.shape, cells, x0, y0))
+    numbers = _branch_number_pixels(crop, branch)
+    alpha = np.where(branch | numbers, 255, 0)
+    ys, xs = np.where(alpha)
+    if len(xs) == 0:
+        return np.zeros((1, 1, 4), np.uint8), (x0, y0)
+    margin = 6
+    top = max(0, int(ys.min()) - margin)
+    left = max(0, int(xs.min()) - margin)
+    bottom = min(crop.shape[0], int(ys.max()) + margin + 1)
+    right = min(crop.shape[1], int(xs.max()) + margin + 1)
+    sprite = np.zeros((bottom - top, right - left, 4), np.uint8)
+    sprite[:, :, :3] = crop[top:bottom, left:right]
+    sprite[:, :, 3] = alpha[top:bottom, left:right]
+    return sprite, (x0 + left, y0 + top)
+
+
+def _ring_mask(shape: tuple[int, ...], cells: list[Cell], origin_x: int, origin_y: int) -> np.ndarray:
+    """Where the detected circles sit, in crop coordinates."""
+    mask = np.zeros(shape[:2], np.uint8)
+    for cell in cells:
+        cv2.rectangle(
+            mask,
+            (int(cell.x0) - origin_x, int(cell.y0) - origin_y),
+            (int(cell.x1) - origin_x, int(cell.y1) - origin_y),
+            255,
+            -1,
+        )
+    return cv2.dilate(mask, np.ones((9, 9), np.uint8))
+
+
+def _branch_pixels(crop: np.ndarray, rings: np.ndarray) -> np.ndarray:
+    """Ring paint and the lighter stroke of the same branch. Not the white card."""
+    red, green, blue = (crop[:, :, i].astype(np.int16) for i in range(3))
+    peak = np.maximum(np.maximum(red, green), blue)
+    chroma = peak - np.minimum(np.minimum(red, green), blue)
+    not_white = peak < 246
+    greenish = (green > red + 6) & (green + 2 >= blue) & not_white & (chroma >= 8) & (green > 30)
+    reddish = (red > green + 14) & (red > blue + 14) & not_white & (red > 30)
+    bluish = (blue > red + 10) & (blue > green + 6) & not_white & (blue > 30)
+    raw = greenish | reddish | bluish
+    count, labels, stats, _centroids = cv2.connectedComponentsWithStats(raw.astype(np.uint8), 8)
+    keep = np.zeros(raw.shape, dtype=bool)
+    for index in range(1, count):
+        if int(stats[index, cv2.CC_STAT_AREA]) < 200:
+            continue
+        # The arm runs through the circles. A colored icon that does not touch them stays off.
+        if not np.any((labels == index) & (rings > 0)):
+            continue
+        keep[labels == index] = True
+    return keep
+
+
+def _branch_number_pixels(crop: np.ndarray, branch: np.ndarray) -> np.ndarray:
+    """Gray digits 1–6 that sit beside the arms. One glyph, already printed."""
+    gray = crop.mean(axis=2)
+    red, green, blue = (crop[:, :, i].astype(np.int16) for i in range(3))
+    peak = np.maximum(np.maximum(red, green), blue)
+    chroma = peak - np.minimum(np.minimum(red, green), blue)
+    neutral = (gray < 195) & (chroma < 10) & ~branch
+    count, labels, stats, _centroids = cv2.connectedComponentsWithStats(neutral.astype(np.uint8), 8)
+    distance = cv2.distanceTransform(np.where(branch, 0, 255).astype(np.uint8), cv2.DIST_L2, 3)
+    keep = np.zeros(neutral.shape, dtype=bool)
+    for index in range(1, count):
+        area = int(stats[index, cv2.CC_STAT_AREA])
+        x = int(stats[index, cv2.CC_STAT_LEFT])
+        y = int(stats[index, cv2.CC_STAT_TOP])
+        width = int(stats[index, cv2.CC_STAT_WIDTH])
+        height = int(stats[index, cv2.CC_STAT_HEIGHT])
+        if not (80 <= area <= 800 and 6 <= width <= 42 and 18 <= height <= 48):
+            continue
+        sub = labels[y : y + height, x : x + width] == index
+        digit, score = read_digit(sub)
+        if digit not in "123456" or score < 0.70:
+            continue
+        # The numeral is beside the arm. A narrow scrap farther out is not a branch number.
+        if float(distance[y : y + height, x : x + width][sub].min()) > 40:
+            continue
+        keep[labels == index] = True
+    return keep
 
 
 def _saturation(color: tuple[int, int, int]) -> int:

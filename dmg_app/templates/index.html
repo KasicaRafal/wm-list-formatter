@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Siatki obrażeń</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main>
+    <p class="kicker">Warmachine · Health Only</p>
+    <h1>Siatki obrażeń</h1>
+    <p class="lead">
+      Wgraj PDF „Health Only” z aplikacji i jeden obrazek tła.
+      Dostaniesz PDF do druku: każda kratka albo spirala to karta 63 × 88 mm,
+      z tłem już pod spodem, znakami cięcia i odstępem między kartami.
+    </p>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <form action="{{ url_for('generate') }}" method="post" enctype="multipart/form-data">
+      <label>
+        PDF Health Only
+        <input type="file" name="pdf" accept="application/pdf,.pdf" required>
+      </label>
+      <label>
+        Obrazek tła
+        <input type="file" name="image" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" required>
+      </label>
+      <label>
+        Papier
+        <select name="paper">
+          <option value="a4" selected>A4</option>
+          <option value="letter">Letter</option>
+        </select>
+      </label>
+      <button type="submit">Pobierz PDF</button>
+    </form>
+
+    <ul class="notes">
+      <li>Zostają tylko modele z prawdziwą siatką: kratka pól albo kolorowa spirala.</li>
+      <li>Sam znacznik HP, podpis jednostki i puste linie karty są pomijane.</li>
+      <li>Kolor gałęzi spirali zostaje. Szare pola kratki zostają szare, puste pola pokazują tło.</li>
+    </ul>
+  </main>
+</body>
+</html>
